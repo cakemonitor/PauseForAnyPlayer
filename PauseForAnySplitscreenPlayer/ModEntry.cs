@@ -24,6 +24,7 @@ namespace PauseForAnySplitscreenPlayer
 
             Helper.Events.GameLoop.UpdateTicked += GameLoop_UpdateTicked;
             Helper.Events.GameLoop.SaveLoaded += GameLoop_SaveLoaded;
+            Helper.Events.GameLoop.GameLaunched += GameLoop_GameLaunched;
             Helper.Events.Multiplayer.ModMessageReceived += Multiplayer_ModMessageReceived;
             Helper.Events.Multiplayer.PeerConnected += Multiplayer_PeerConnected;
             Helper.Events.Multiplayer.PeerDisconnected += Multiplayer_PeerDisconnected;
@@ -176,6 +177,38 @@ namespace PauseForAnySplitscreenPlayer
         private void Multiplayer_PeerDisconnected(object sender, PeerDisconnectedEventArgs e)
         {
             this.playerPauseStates.Remove(e.Peer.PlayerID);
+        }
+
+        private void GameLoop_GameLaunched(object sender, GameLaunchedEventArgs e)
+        {
+            // Get GMCM API
+            var configMenu = this.Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
+            if (configMenu is null)
+                return;
+
+            // Only show config menu to host in network multiplayer (or always in single-player/splitscreen)
+            if (Game1.IsMultiplayer && !Game1.hasLocalClientsOnly && !Context.IsMainPlayer)
+                return;
+
+            // Register mod
+            configMenu.Register(
+                mod: this.ModManifest,
+                reset: () => this.config = new ModConfig(),
+                save: () => this.Helper.WriteConfig(this.config)
+            );
+
+            // Add energy scale factor slider
+            configMenu.AddNumberOption(
+                mod: this.ModManifest,
+                name: () => "Energy Scale Factor",
+                tooltip: () => "Multiplier for energy gains (1.0 = normal, 0.5 = half energy, etc.)",
+                getValue: () => this.config.EnergyScaleFactor,
+                setValue: value => this.config.EnergyScaleFactor = value,
+                min: 0.1f,
+                max: 2.0f,
+                interval: 0.05f,
+                formatValue: value => $"{value:F2}x"
+            );
         }
     }
 }
