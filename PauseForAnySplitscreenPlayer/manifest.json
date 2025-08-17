@@ -1,0 +1,10 @@
+﻿{
+	"Name": "Pause For Any Splitscreen Player",
+	"Author": "cakemonitor",
+	"Version": "1.0.0",
+	"Description": "Pauses a splitscreen game if any player is in a paused state",
+	"UniqueID": "cakemonitor.PauseForAnySplitscreenPlayer",
+	"EntryDll": "PauseForAnySplitscreenPlayer.dll",
+	"MinimumApiVersion": "4.0.0",
+	"UpdateKeys": []
+}

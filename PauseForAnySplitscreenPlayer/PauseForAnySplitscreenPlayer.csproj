@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    
+    <!-- ModBuildConfig settings -->
+    <EnableModDeploy>true</EnableModDeploy>      <!-- Auto-deploy to Mods folder -->
+    <EnableModZip>true</EnableModZip>            <!-- Create release zip -->
+    <ModFolderName>PauseForAnySplitscreenPlayer</ModFolderName>  <!-- Custom folder name -->
+    <GameModsDir></GameModsDir>                  <!-- Custom game path (empty = auto-detect) -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Pathoschild.Stardew.ModBuildConfig" Version="4.1.1" />
+  </ItemGroup>
+
+</Project>
