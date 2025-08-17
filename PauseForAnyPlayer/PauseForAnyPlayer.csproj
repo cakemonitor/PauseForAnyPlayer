@@ -6,7 +6,7 @@
     <!-- ModBuildConfig settings -->
     <EnableModDeploy>true</EnableModDeploy>      <!-- Auto-deploy to Mods folder -->
     <EnableModZip>true</EnableModZip>            <!-- Create release zip -->
-    <ModFolderName>PauseForAnySplitscreenPlayer</ModFolderName>  <!-- Custom folder name -->
+    <ModFolderName>PauseForAnyPlayer</ModFolderName>  <!-- Custom folder name -->
     <GameModsDir></GameModsDir>                  <!-- Custom game path (empty = auto-detect) -->
   </PropertyGroup>
 

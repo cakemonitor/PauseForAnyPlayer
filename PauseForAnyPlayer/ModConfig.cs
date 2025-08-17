@@ -1,4 +1,4 @@
-namespace PauseForAnySplitscreenPlayer
+namespace PauseForAnyPlayer
 {
     public class ModConfig
     {

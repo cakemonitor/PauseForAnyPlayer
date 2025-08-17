@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.4.33213.308
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PauseForAnySplitscreenPlayer", "PauseForAnySplitscreenPlayer\PauseForAnySplitscreenPlayer.csproj", "{59628157-8727-45F4-AB36-8E0B3BB1B00F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PauseForAnyPlayer", "PauseForAnyPlayer\PauseForAnyPlayer.csproj", "{59628157-8727-45F4-AB36-8E0B3BB1B00F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

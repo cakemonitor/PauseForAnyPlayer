@@ -1,7 +1,7 @@
 using System;
 using StardewModdingAPI;
 
-namespace PauseForAnySplitscreenPlayer
+namespace PauseForAnyPlayer
 {
     public interface IGenericModConfigMenuApi
     {

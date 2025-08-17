@@ -4,7 +4,7 @@ using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
 
-namespace PauseForAnySplitscreenPlayer
+namespace PauseForAnyPlayer
 {
     public class ModEntry : Mod
     {
