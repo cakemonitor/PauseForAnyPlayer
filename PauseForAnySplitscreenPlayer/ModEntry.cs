@@ -8,9 +8,13 @@ namespace PauseForAnySplitscreenPlayer
     {
         private bool isPaused;
         private int cachedGameTimeInterval;
+        private ModConfig config;
 
         public override void Entry(IModHelper helper)
         {
+            // Load configuration
+            this.config = this.Helper.ReadConfig<ModConfig>();
+
             Helper.Events.GameLoop.UpdateTicked += GameLoop_UpdateTicked;
         }
 
