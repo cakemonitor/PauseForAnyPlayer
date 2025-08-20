@@ -3,6 +3,8 @@ using System.Linq;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
+using StardewValley.Menus;
+using StardewValley.Minigames;
 
 namespace PauseForAnyPlayer
 {
@@ -14,13 +16,15 @@ namespace PauseForAnyPlayer
         private Dictionary<long, float> previousStaminaByPlayer;
         private Dictionary<long, bool> playerPauseStates;
         private bool lastLocalPauseState;
+        private Dictionary<long, float> previousMaxStaminaByPlayer;
 
         public override void Entry(IModHelper helper)
         {
-            // Load configuration
-            this.config = this.Helper.ReadConfig<ModConfig>();
-            this.previousStaminaByPlayer = new Dictionary<long, float>();
-            this.playerPauseStates = new Dictionary<long, bool>();
+            config = Helper.ReadConfig<ModConfig>();
+
+            playerPauseStates = new Dictionary<long, bool>();
+            previousStaminaByPlayer = new Dictionary<long, float>();
+            previousMaxStaminaByPlayer = new Dictionary<long, float>();
 
             Helper.Events.GameLoop.UpdateTicked += GameLoop_UpdateTicked;
             Helper.Events.GameLoop.SaveLoaded += GameLoop_SaveLoaded;
@@ -32,13 +36,17 @@ namespace PauseForAnyPlayer
 
         private void GameLoop_SaveLoaded(object sender, SaveLoadedEventArgs e)
         {
-            // Initialize tracking for all players when save is loaded
-            this.previousStaminaByPlayer.Clear();
-            this.playerPauseStates.Clear();
-            foreach (Farmer farmer in Game1.getAllFarmers())
+            if (!Game1.IsMultiplayer || Game1.hasLocalClientsOnly || Context.IsMainPlayer)
             {
-                this.previousStaminaByPlayer[farmer.UniqueMultiplayerID] = farmer.Stamina;
-                this.playerPauseStates[farmer.UniqueMultiplayerID] = false;
+                playerPauseStates.Clear();
+                previousStaminaByPlayer.Clear();
+                previousMaxStaminaByPlayer.Clear();
+                foreach (Farmer farmer in Game1.getAllFarmers())
+                {
+                    playerPauseStates[farmer.UniqueMultiplayerID] = false;
+                    previousStaminaByPlayer[farmer.UniqueMultiplayerID] = farmer.Stamina;
+                    previousMaxStaminaByPlayer[farmer.UniqueMultiplayerID] = farmer.MaxStamina;
+                }
             }
         }
 
@@ -47,10 +55,8 @@ namespace PauseForAnyPlayer
             if (!Context.IsWorldReady)
                 return;
 
-            // Handle pause logic
             HandlePauseLogic();
 
-            // Handle energy scaling
             HandleEnergyScaling();
         }
 
@@ -61,12 +67,10 @@ namespace PauseForAnyPlayer
 
             if (Game1.hasLocalClientsOnly)
             {
-                // Local splitscreen multiplayer
                 HandleLocalSplitscreenPause();
             }
             else
             {
-                // Network multiplayer
                 HandleNetworkMultiplayerPause();
             }
         }
@@ -79,6 +83,10 @@ namespace PauseForAnyPlayer
                 if (onlineFarmer.requestingTimePause.Value)
                 {
                     shouldPause = true;
+                    if (!isPaused)
+                    {
+                        Monitor.Log($"Pause requested by {onlineFarmer.Name}", LogLevel.Debug);
+                    }
                     break;
                 }
             }
@@ -88,25 +96,35 @@ namespace PauseForAnyPlayer
 
         private void HandleNetworkMultiplayerPause()
         {
-            // Send local player's pause state to host (only when changed)
             bool localShouldPause = ShouldLocalPlayerPause();
-            if (localShouldPause != lastLocalPauseState)
-            {
-                this.Helper.Multiplayer.SendMessage(localShouldPause, "PauseState", new[] { this.ModManifest.UniqueID });
-                lastLocalPauseState = localShouldPause;
-            }
 
-            // Only host controls time
             if (Context.IsMainPlayer)
             {
-                bool shouldPause = this.playerPauseStates.Values.Any(state => state == true);
+                bool shouldPause = localShouldPause || playerPauseStates.Values.Any(state => state == true);
+                if (!isPaused && localShouldPause)
+                {
+                    Monitor.Log($"Pause requested by host", LogLevel.Debug);
+                }
                 ControlGameTime(shouldPause);
+            }
+            else if (localShouldPause != lastLocalPauseState)
+            {
+                lastLocalPauseState = localShouldPause;
+                Helper.Multiplayer.SendMessage(localShouldPause, "PauseState", new[] { ModManifest.UniqueID });
             }
         }
 
-        private bool ShouldLocalPlayerPause()
+        private static bool ShouldLocalPlayerPause()
         {
-            return Game1.player.requestingTimePause.Value;
+            bool playerInEvent = Game1.eventUp;
+
+            bool playerInMenu = Game1.activeClickableMenu is not null
+                and not ConfirmationDialog
+                and not NumberSelectionMenu;
+
+            bool playerInMinigame = Game1.currentMinigame is FishingGame or AbigailGame or MineCart;
+
+            return playerInEvent || playerInMenu || playerInMinigame;
         }
 
         private void ControlGameTime(bool shouldPause)
@@ -130,80 +148,130 @@ namespace PauseForAnyPlayer
 
         private void HandleEnergyScaling()
         {
-            // Only host controls energy scaling in network multiplayer
-            if (Game1.IsMultiplayer && !Game1.hasLocalClientsOnly && !Context.IsMainPlayer)
+            if (config.EnergyScaleFactor == 1.0f)
                 return;
 
-            if (config.EnergyScaleFactor == 1.0f)
+            if (Game1.IsMultiplayer && !Game1.hasLocalClientsOnly && !Context.IsMainPlayer)
                 return;
 
             foreach (Farmer farmer in Game1.getAllFarmers())
             {
                 long playerId = farmer.UniqueMultiplayerID;
                 float currentStamina = farmer.Stamina;
+                float currentMaxStamina = farmer.MaxStamina;
                 
-                if (!previousStaminaByPlayer.ContainsKey(playerId))
-                {
-                    previousStaminaByPlayer[playerId] = currentStamina;
-                    continue;
-                }
+                float previousStamina = previousStaminaByPlayer.ContainsKey(playerId)
+                    ? previousStaminaByPlayer[playerId]
+                    : currentStamina;
 
-                float previousStamina = previousStaminaByPlayer[playerId];
-                if (currentStamina > previousStamina)
+                float previousMaxStamina = previousMaxStaminaByPlayer.ContainsKey(playerId)
+                    ? previousMaxStaminaByPlayer[playerId]
+                    : currentMaxStamina;
+
+                float energyGained = currentStamina - previousStamina;
+                if (energyGained > 0)
                 {
-                    float energyGained = currentStamina - previousStamina;
-                    float scaledEnergy = energyGained * config.EnergyScaleFactor;
-                    farmer.Stamina = previousStamina + scaledEnergy;
+                    if (currentMaxStamina > previousMaxStamina)
+                    {
+                        Monitor.Log($"Max stamina increased for {farmer.Name} ({previousMaxStamina} -> {currentMaxStamina}) - skipping scaling (Stardrop?)", LogLevel.Debug);
+                    }
+                    else if (Game1.timeOfDay >= 600 && Game1.timeOfDay <= 610)
+                    {
+                        Monitor.Log($"Energy gain at {Game1.timeOfDay} for {farmer.Name}: {energyGained} - skipping scaling (overnight restoration)", LogLevel.Debug);
+                    }
+                    else
+                    {
+                        float scaledEnergyGained = energyGained * config.EnergyScaleFactor;
+                        float newStamina = previousStamina + scaledEnergyGained;
+
+                        Monitor.Log($"Scaling energy gain for {farmer.Name}: {energyGained} -> {scaledEnergyGained}, setting stamina to {newStamina}", LogLevel.Debug);
+                        farmer.Stamina = newStamina;
+
+                        if (Game1.IsMultiplayer && !Game1.hasLocalClientsOnly && !farmer.IsLocalPlayer)
+                        {
+                            Helper.Multiplayer.SendMessage(newStamina, "EnergyUpdate", new[] { ModManifest.UniqueID }, new[] { playerId });
+                        }
+                    }
                 }
                 
                 previousStaminaByPlayer[playerId] = farmer.Stamina;
+                previousMaxStaminaByPlayer[playerId] = farmer.MaxStamina;
             }
         }
 
+
+
         private void Multiplayer_ModMessageReceived(object sender, ModMessageReceivedEventArgs e)
         {
-            if (e.FromModID == this.ModManifest.UniqueID && e.Type == "PauseState")
+            if (e.FromModID != ModManifest.UniqueID)
+                return;
+
+            if (e.Type == "PauseState")
             {
                 bool pauseState = e.ReadAs<bool>();
-                this.playerPauseStates[e.FromPlayerID] = pauseState;
+                playerPauseStates[e.FromPlayerID] = pauseState;
+
+                var farmer = Game1.GetPlayer(e.FromPlayerID);
+                if (farmer != null)
+                {
+                    Monitor.Log($"Received update from {farmer.Name}: pause state = {pauseState}", LogLevel.Debug);
+                }
             }
+            else if (e.Type == "EnergyUpdate")
+            {
+                float newStamina = e.ReadAs<float>();
+                Game1.player.Stamina = newStamina;
+
+                Monitor.Log($"Received energy update: setting stamina to {newStamina}", LogLevel.Debug);
+            }
+
         }
 
         private void Multiplayer_PeerConnected(object sender, PeerConnectedEventArgs e)
         {
-            this.playerPauseStates[e.Peer.PlayerID] = false;
+            if (Context.IsMainPlayer)
+            {
+                var farmer = Game1.GetPlayer(e.Peer.PlayerID);
+                if (farmer != null)
+                {
+                    playerPauseStates[e.Peer.PlayerID] = false;
+                    previousStaminaByPlayer[e.Peer.PlayerID] = farmer.Stamina;
+                    previousMaxStaminaByPlayer[e.Peer.PlayerID] = farmer.MaxStamina;
+                }
+            }
         }
 
         private void Multiplayer_PeerDisconnected(object sender, PeerDisconnectedEventArgs e)
         {
-            this.playerPauseStates.Remove(e.Peer.PlayerID);
+            if (Context.IsMainPlayer)
+            {
+                playerPauseStates.Remove(e.Peer.PlayerID);
+                previousStaminaByPlayer.Remove(e.Peer.PlayerID);
+                previousMaxStaminaByPlayer.Remove(e.Peer.PlayerID);
+            }
         }
 
         private void GameLoop_GameLaunched(object sender, GameLaunchedEventArgs e)
         {
-            // Get GMCM API
-            var configMenu = this.Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
+            var configMenu = Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
             if (configMenu is null)
                 return;
 
-            // Only show config menu to host in network multiplayer (or always in single-player/splitscreen)
             if (Game1.IsMultiplayer && !Game1.hasLocalClientsOnly && !Context.IsMainPlayer)
                 return;
 
-            // Register mod
             configMenu.Register(
-                mod: this.ModManifest,
-                reset: () => this.config = new ModConfig(),
-                save: () => this.Helper.WriteConfig(this.config)
+                mod: ModManifest,
+                reset: () => config = new ModConfig(),
+                save: () => Helper.WriteConfig(config)
             );
 
-            // Add energy scale factor slider
             configMenu.AddNumberOption(
-                mod: this.ModManifest,
+                mod: ModManifest,
                 name: () => "Energy Scale Factor",
                 tooltip: () => "Multiplier for energy gains (1.0 = normal, 0.5 = half energy, etc.)",
-                getValue: () => this.config.EnergyScaleFactor,
-                setValue: value => this.config.EnergyScaleFactor = value,
+                getValue: () => config.EnergyScaleFactor,
+                setValue: value => config.EnergyScaleFactor = value,
                 min: 0.1f,
                 max: 2.0f,
                 interval: 0.05f,

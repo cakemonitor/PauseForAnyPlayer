@@ -49,3 +49,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Project planning
+TODO.md
