@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
@@ -20,6 +20,8 @@ namespace PauseForAnyPlayer
 
         public override void Entry(IModHelper helper)
         {
+            Monitor.Log($"PauseForAnyPlayer loaded - v{ModManifest.Version}", LogLevel.Info);
+
             config = Helper.ReadConfig<ModConfig>();
 
             playerPauseStates = new Dictionary<long, bool>();
@@ -83,10 +85,6 @@ namespace PauseForAnyPlayer
                 if (onlineFarmer.requestingTimePause.Value)
                 {
                     shouldPause = true;
-                    if (!isPaused)
-                    {
-                        Monitor.Log($"Pause requested by {onlineFarmer.Name}", LogLevel.Debug);
-                    }
                     break;
                 }
             }
@@ -101,10 +99,6 @@ namespace PauseForAnyPlayer
             if (Context.IsMainPlayer)
             {
                 bool shouldPause = localShouldPause || playerPauseStates.Values.Any(state => state == true);
-                if (!isPaused && localShouldPause)
-                {
-                    Monitor.Log($"Pause requested by host", LogLevel.Debug);
-                }
                 ControlGameTime(shouldPause);
             }
             else if (localShouldPause != lastLocalPauseState)
@@ -173,18 +167,18 @@ namespace PauseForAnyPlayer
                 {
                     if (currentMaxStamina > previousMaxStamina)
                     {
-                        Monitor.Log($"Max stamina increased for {farmer.Name} ({previousMaxStamina} -> {currentMaxStamina}) - skipping scaling (Stardrop?)", LogLevel.Debug);
+                        // Monitor.Log($"Max stamina increased for {farmer.Name} ({previousMaxStamina} -> {currentMaxStamina}) - skipping scaling (Stardrop?)", LogLevel.Debug);
                     }
                     else if (Game1.timeOfDay >= 600 && Game1.timeOfDay <= 610)
                     {
-                        Monitor.Log($"Energy gain at {Game1.timeOfDay} for {farmer.Name}: {energyGained} - skipping scaling (overnight restoration)", LogLevel.Debug);
+                        // Monitor.Log($"Energy gain at {Game1.timeOfDay} for {farmer.Name}: {energyGained} - skipping scaling (overnight restoration)", LogLevel.Debug);
                     }
                     else
                     {
                         float scaledEnergyGained = energyGained * config.EnergyScaleFactor;
                         float newStamina = previousStamina + scaledEnergyGained;
 
-                        Monitor.Log($"Scaling energy gain for {farmer.Name}: {energyGained} -> {scaledEnergyGained}, setting stamina to {newStamina}", LogLevel.Debug);
+                        // Monitor.Log($"Scaling energy gain for {farmer.Name}: {energyGained} -> {scaledEnergyGained}, setting stamina to {newStamina}", LogLevel.Debug);
                         farmer.Stamina = newStamina;
 
                         if (Game1.IsMultiplayer && !Game1.hasLocalClientsOnly && !farmer.IsLocalPlayer)
@@ -210,19 +204,11 @@ namespace PauseForAnyPlayer
             {
                 bool pauseState = e.ReadAs<bool>();
                 playerPauseStates[e.FromPlayerID] = pauseState;
-
-                var farmer = Game1.GetPlayer(e.FromPlayerID);
-                if (farmer != null)
-                {
-                    Monitor.Log($"Received update from {farmer.Name}: pause state = {pauseState}", LogLevel.Debug);
-                }
             }
             else if (e.Type == "EnergyUpdate")
             {
                 float newStamina = e.ReadAs<float>();
                 Game1.player.Stamina = newStamina;
-
-                Monitor.Log($"Received energy update: setting stamina to {newStamina}", LogLevel.Debug);
             }
 
         }
