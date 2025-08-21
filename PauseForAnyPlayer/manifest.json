@@ -1,7 +1,7 @@
 ﻿{
 	"Name": "Pause For Any Player",
 	"Author": "cakemonitor",
-	"Version": "1.0.2",
+	"Version": "1.0.3",
 	"Description": "Pauses the game if any player is in a paused state (splitscreen or network multiplayer)",
 	"UniqueID": "cakemonitor.PauseForAnyPlayer",
 	"EntryDll": "PauseForAnyPlayer.dll",
